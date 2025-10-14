@@ -2,19 +2,20 @@
 #include <Wire.h>
 #include <math.h>
 #include <Encoder.h>
-// #include <Adafruit_ILI9341.h>
+#include <Adafruit_ILI9341.h>
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_MCP4728.h>
 #include <Adafruit_LSM6DSOX.h>
-#include <ILI9341_T4.h>
+// #include <ILI9341_T4.h>
 #include <tgx.h>
-// #include <Adafruit_GFX.h>
+#include <Adafruit_GFX.h>
+
 // #include <Adafruit_GFX_Buffer.h>
 // #include <XInput.h>
 // #include <ResponsiveAnalogRead.h>
 #include <Keyboard.h>
 #include <usb_midi.h>
-#include <ADC.h>
+// #include <ADC.h>
 // #include <analogReadAsync.h>
 // #include <tgx_font.h>
 
@@ -88,10 +89,10 @@ namespace PINOUTS
 
   namespace TRIGGERS
   {
-    const int LT = 40;
-    const int LB = 31;    //IS A BUTTON
-    const int RT = 38;
-    const int RB = 32;    //IS A BUTTON
+    const int LT = 14;
+    const int RT = 15;
+    const int LB = 7;    //IS A BUTTON
+    const int RB = 6;    //IS A BUTTON
   };
 
   namespace MISC_BUTTONS
@@ -118,6 +119,16 @@ namespace PINOUTS
     const int UD = A9;
   };
 
+
+};
+
+typedef struct HADES_DEMO
+{
+
+};
+
+typedef struct MINECRAFT_DEMO
+{
 
 };
 
@@ -181,7 +192,7 @@ typedef struct Button {
 
 typedef struct Potentiometer {
   const int pin;
-  moving_average_filter<int>* filter;
+  moving_average_filter* filter;
   String name;
   // char key_press;
   int value = 0;
@@ -224,7 +235,6 @@ typedef struct Gyroscope {
 #define WIRE Wire1
 #define SCREEN_HEIGHT 320
 #define SCREEN_WIDTH 240
-#define PIN_BACKLIGHT 255   // optional, set this only if the screen LED pin is connected directly to the Teensy.
 /*
   pins to avoid for analog read (from https://forum.pjrc.com/index.php?threads%2Fteensy-4-1-adc-channels.72373%2F)
   255,	// 10/A10 AD_B0_12 - only on ADC1, 1 - can't use for audio
@@ -238,36 +248,26 @@ typedef struct Gyroscope {
   ...
 	1,      // 38/A14 AD_B1_12 - only on ADC2, do not use analogRead()
 	2,      // 39/A15 AD_B1_13 - only on ADC2, do not use analogRead()
+
 */
 
-// Adafruit_ILI9341 display = Adafruit_ILI9341(PINOUTS::TFT_DISPLAY::CS, PINOUTS::TFT_DISPLAY::DC);
-ILI9341_T4::ILI9341Driver display( PINOUTS::TFT_DISPLAY::CS, PINOUTS::TFT_DISPLAY::DC, PINOUTS::TFT_DISPLAY::SCK, PINOUTS::TFT_DISPLAY::MOSI, PINOUTS::TFT_DISPLAY::MISO, 255, 255, 255); 
-uint16_t fb[240 * 320]; // frame buffer
-DMAMEM uint16_t fb_internal[240 * 320]; // internal frame buffer
-
-ILI9341_T4::DiffBuffStatic<4096> diff1; // store changes in pixels so we don't have to refresh the entire screen
-ILI9341_T4::DiffBuffStatic<4096> diff2; // since we use two frame buffers, we have two of these as well. their github suggests two of these
-// tgx::dVec2 anchor;
-
-tgx::Image<tgx::RGB565> im(fb, SCREEN_HEIGHT, SCREEN_WIDTH);
-
-ADC *adc();
+Adafruit_ILI9341 display = Adafruit_ILI9341(PINOUTS::TFT_DISPLAY::CS, PINOUTS::TFT_DISPLAY::DC);
 
 Adafruit_NeoPixel neopixel = Adafruit_NeoPixel();
 Adafruit_MCP4728 mcp_dac;
 Adafruit_LSM6DSOX sox_gyro;
 
 float joystick_filter_coef = 0.9f;
-moving_average_filter<int> ljud_filter(joystick_filter_coef, 0);
-moving_average_filter<int> ljlr_filter(joystick_filter_coef, 0);
-moving_average_filter<int> rjud_filter(joystick_filter_coef, 0);
-moving_average_filter<int> rjlr_filter(joystick_filter_coef, 0);
-moving_average_filter<int>* joystick_filters[4] = {&ljud_filter, &ljlr_filter, &rjud_filter, &rjlr_filter};
+moving_average_filter ljud_filter(joystick_filter_coef, 0);
+moving_average_filter ljlr_filter(joystick_filter_coef, 0);
+moving_average_filter rjud_filter(joystick_filter_coef, 0);
+moving_average_filter rjlr_filter(joystick_filter_coef, 0);
+moving_average_filter* joystick_filters[4] = {&ljud_filter, &ljlr_filter, &rjud_filter, &rjlr_filter};
 
 float triggers_filter_coef = 0.9f;
-moving_average_filter<int> lt_filter(triggers_filter_coef, 2);
-moving_average_filter<int> rt_filter(triggers_filter_coef, 2);
-moving_average_filter<int>* trigger_filters[2] = {&lt_filter, &rt_filter};
+moving_average_filter lt_filter(triggers_filter_coef, 2);
+moving_average_filter rt_filter(triggers_filter_coef, 2);
+moving_average_filter* trigger_filters[2] = {&lt_filter, &rt_filter};
 
 BUTTON x_button = {PINOUTS::XYAB_BUTTONS::X, "X", KEY_X};
 BUTTON y_button = {PINOUTS::XYAB_BUTTONS::Y, "Y", KEY_Y};
@@ -351,14 +351,14 @@ void read_button(BUTTON* button) {
   if(!button->prev_state && button->state) {
     button->button_state = BUTTON_STATE::PRESS;
   }
-  else if(button->prev_state && button->state) {
-    button->button_state = BUTTON_STATE::HOLD;
+  else if (!button->prev_state && !button->state) {
+    button->button_state = BUTTON_STATE::OFF;
   }
   else if(button->prev_state && !button->state) {
     button->button_state = BUTTON_STATE::RELEASE;
   }
-  else {
-    button->button_state = BUTTON_STATE::OFF;
+  else if(button->prev_state && button->state) {
+    button->button_state = BUTTON_STATE::HOLD;
   }
 }
 
@@ -412,24 +412,13 @@ void read_potentiometers(POT* pots[], size_t size) {
 } 
 
 void press_button(BUTTON* button, int mode) {
-  // switch(button->button_state) {
-  //   case BUTTON_STATE::PRESS:
-  //   break;
-  //   case BUTTON_STATE::HOLD:
-  //   break;
-  //   case BUTTON_STATE::RELEASE:
-  //   break;
-  //   case BUTTON_STATE::OFF:
-  //   break;
-  //   default:
-  //   break;
-  // }
-  if(button->button_state == BUTTON_STATE::PRESS) {
+  if(button->prev_button_state == BUTTON_STATE::OFF && button->button_state == BUTTON_STATE::PRESS) {
 
     //keyboard input
     if(static_cast<OUTPUT_MODE>(mode) == OUTPUT_MODE::KEYBOARD) {
         Keyboard.press(button->key_press);
         Keyboard.release(button->key_press);
+        delay(10);
     }
   }
   else {
@@ -456,6 +445,16 @@ void press_misc_midi_test(BUTTON* button, int mode) {
   }
 }
 
+void DEBUG_potentiometers(POT* pot, int x, int y, int text_color, int bg_color, bool flag = true) {
+  String out = pot->name + ": " + pot->value + " ";
+  if(pot->prev_value != pot->value) {
+    DEBUG_clear_text(out, x, y);
+    DEBUG_display_text(out, text_color, bg_color, x, y);
+  }
+  if(flag) Serial.println(out);
+  else Serial.print(out);
+}
+
 void setup() {
 
   // display.cp437(true);
@@ -464,23 +463,15 @@ void setup() {
   Keyboard.begin();
   usbMIDI.begin();
 
-  // display.begin();
+  display.begin();
 
-  if(!display.begin())
-    Serial.println("hello silas i did not begin -ili9341 display");
+  // if(!display.begin())
+  //   Serial.println("hello silas i did not begin -ili9341 display");
 
-  pinMode(PIN_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_BACKLIGHT, HIGH);  // ... turn on backlight
-  // ok. turn on backlight
-  // pinMode(PIN_BACKLIGHT, OUTPUT);
-  // digitalWrite(PIN_BACKLIGHT, HIGH);
-  // display.setRotation(3); // apparently this is portrait mode from some of the examples
-  display.setRotation(3); // apparently this is portrait mode from some of the examples
-  display.setFramebuffer(fb_internal);
-  display.setDiffBuffers(&diff1, &diff2);
-  display.setDiffGap(4); // small gap
-  display.setRefreshRate(120); // refresh rate in MHz, frame rate can't exceed (rate) / 2
-  display.setVSyncSpacing(2); // enable vsync and set framerate = refreshrate/2 (typical choice)
+  // display.setFramebuffer(fb_internal);
+  // display.setDiffBuffers(&diff1, &diff2);
+  // display.setRefreshRate(120); // refresh rate in MHz, frame rate can't exceed (rate) / 2
+  // display.setVSyncSpacing(2); // enable vsync and set framerate = refreshrate/2 (typical choice)
   // display.update(fb)
 
   sox_gyro.begin_I2C(0x6A, &Wire);
@@ -509,51 +500,62 @@ void setup() {
 
   // DEBUG_buttons(a_button, 100, 100, ILI9341_WHITE, ILI9341_BLACK);
 
-  im.drawText("debug display", {50, 50}, font_tgx_OpenSans_14, tgx::RGB565_White);
-  display.update(fb);
-  // display.fillScreen(ILI9341_BLACK);
-  // display.setCursor(0, 0);
-  // display.setTextColor(ILI9341_WHITE);
-  // display.setTextSize(2); //2(6 x 8)
-  // display.setRotation(4);
-  // display.println("debug display");
+  display.setRotation(4);
+  display.fillScreen(ILI9341_BLACK);
+  display.setCursor(0, 0);
+  display.setTextColor(ILI9341_WHITE);
+  display.setTextSize(2); //2(6 x 8)
+  display.setRotation(4);
+  display.println("debug display");
 }
 int foo = 0;
 void loop() {
 
-  for(int i = 0; i < 4; i++) {
-    press_button(xyab_buttons[i], static_cast<int>(OUTPUT_MODE::KEYBOARD));
-    press_button(dpad_buttons[i], static_cast<int>(OUTPUT_MODE::KEYBOARD));
-  }
-  press_misc_midi_test(&misc_home_button, static_cast<int>(OUTPUT_MODE::KEYBOARD));
-  press_misc_midi_test(&misc_menu_button, static_cast<int>(OUTPUT_MODE::KEYBOARD));
-
   read_gyroscope(&gyro_vals);
   sneb_midi_gyro(&gyro_vals);
+  
 
   mcp_dac.fastWrite(normalise1(0, left_trigger.value, 0, 985, 0, 4095), normalise1(0, right_trigger.value, 0, 985, 0, 4095), 4095, 0);
   if(millis() > lastFrame + frameRate) {
     lastFrame = millis();
+    for(int i = 0; i < 4; i++) {
+      press_button(xyab_buttons[i], static_cast<int>(OUTPUT_MODE::KEYBOARD));
+      press_button(dpad_buttons[i], static_cast<int>(OUTPUT_MODE::KEYBOARD));
+    }
+    read_all_params();
+    display_all_params();
+    // DEBUG_potentiometers(&joysticks[0]->x_pot, 0, 130 + (16 * 0), ILI9341_WHITE, ILI9341_BLACK, false);
+    // DEBUG_potentiometers(&joysticks[0]->y_pot, 120, 130 + (16 * 0), ILI9341_WHITE, ILI9341_BLACK, true);
+    // Serial.println();
+    // DEBUG_potentiometers(&joysticks[1]->x_pot, 0, 130 + (16 * 1), ILI9341_WHITE, ILI9341_BLACK, false);
+    // DEBUG_potentiometers(&joysticks[1]->y_pot, 120, 130 + (16 * 1), ILI9341_WHITE, ILI9341_BLACK, true);
+    // DEBUG_potentiometers(triggers[0], 0 + (96 * 0), 226, ILI9341_WHITE, ILI9341_BLACK);
+    // DEBUG_potentiometers(triggers[1], 0 + (96 * 1), 226, ILI9341_WHITE, ILI9341_BLACK);
+    press_misc_midi_test(&misc_home_button, static_cast<int>(OUTPUT_MODE::KEYBOARD));
+    press_misc_midi_test(&misc_menu_button, static_cast<int>(OUTPUT_MODE::KEYBOARD));
+  
+  }
+}
 
-    //arrays of size 4
-    for(size_t i = 0; i < 4; i++) {
-      // DEBUG_buttons(xyab_buttons[i], 0, 50 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-      // DEBUG_buttons(dpad_buttons[i], 84, 50 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-      
-    }
-  //   //arrays of size 2
-    for(size_t i = 0; i < 2; i++) {
-      // press_button(misc_buttons[i]);
-      // DEBUG_potentiometers(&joysticks[i]->x_pot, 0, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-      // DEBUG_potentiometers(&joysticks[i]->y_pot, 120, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-      // DEBUG_buttons(joystick_buttons[i], 0, 178 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-      // DEBUG_buttons(misc_buttons[i], 134, 178 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-      // DEBUG_buttons(trigger_buttons[i], 0 + (96 * i), 242, ILI9341_WHITE, ILI9341_BLACK);
-      // Serial.print(misc_buttons[0]->prev_state);
-      // Serial.print(" ");
-      // Serial.println(misc_buttons[0]->state);
-      // DEBUG_potentiometers(triggers[i], 0 + (96 * i), 226, ILI9341_WHITE, ILI9341_BLACK);
-    }
+void display_all_params() {
+  //arrays of size 4
+  for(size_t i = 0; i < 4; i++) {
+    DEBUG_buttons(xyab_buttons[i], 0, 50 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
+    DEBUG_buttons(dpad_buttons[i], 84, 50 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
+  }
+  //arrays of size 2
+  for(size_t i = 0; i < 2; i++) {
+    // press_button(misc_buttons[i]);
+    DEBUG_potentiometers(&joysticks[i]->x_pot, 0, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK, true);
+    DEBUG_potentiometers(&joysticks[i]->y_pot, 120, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK, true);
+    DEBUG_buttons(joystick_buttons[i], 0, 178 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
+    DEBUG_buttons(misc_buttons[i], 134, 178 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
+    DEBUG_buttons(trigger_buttons[i], 0 + (96 * i), 242, ILI9341_WHITE, ILI9341_BLACK);
+    DEBUG_potentiometers(triggers[i], 0 + (96 * i), 226, ILI9341_WHITE, ILI9341_BLACK, true);
+  }
+}
+
+void read_all_params() {
   read_joysticks(joysticks, std::size(joysticks));
   read_potentiometers(triggers, std::size(triggers));
 
@@ -562,7 +564,6 @@ void loop() {
   read_buttons(misc_buttons, std::size(misc_buttons));
   read_buttons(joystick_buttons, std::size(joystick_buttons));
   read_buttons(trigger_buttons, std::size(trigger_buttons));
-  }
 }
 
 /**
@@ -596,6 +597,9 @@ float normalise1(float to_map, float from, float to, float low, float high) {
   return constrain(map(to_map, from, to, low, high), low, high);
 }
 
+// float rand_float(float from, float to) {
+//   return rand() % (to - from + 1) + from;
+// }
 int rand_int(int from, int to) {
   return rand() % (to - from + 1) + from;
 }
@@ -606,3 +610,4 @@ int rand_int(int from, int to) {
   * structs into objects so i can iteratively debug everything more efficiently
 
 */
+

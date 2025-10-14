@@ -32,12 +32,11 @@ namespace PINOUTS
 {
   namespace TFT_DISPLAY
   {
-    const int CS = 10;
-    const int MOSI = 11;
-    const int MISO = 12;
+    const int DC = 33;
+    const int CS = 36;
     const int SCK = 13;
-    const int RST = 33;
-    const int DC = 34;
+    const int MOSI = 11;
+    const int MISO = 39;
   };
 
   namespace MCP4728_DAC
@@ -58,32 +57,32 @@ namespace PINOUTS
 
   namespace JOYSTICK_L
   {
-    const int SELECT = 2;
-    const int XOUT = A6;
-    const int YOUT = A7;
+    const int SELECT = 29;
+    const int YOUT = A10;
+    const int XOUT = A11;
   };
 
   namespace JOYSTICK_R
   {
-    const int SELECT = 3;
-    const int XOUT = A8;
-    const int YOUT = A9;
+    const int SELECT = 30;
+    const int YOUT = A12;
+    const int XOUT = A13;
   };
 
   namespace DPAD_BUTTONS
   {
-    const int UP = 32;
-    const int DOWN = 31;
-    const int LEFT = 30;
-    const int RIGHT = 29;
+    const int UP = 0;
+    const int DOWN = 1;
+    const int LEFT = 2;
+    const int RIGHT = 3;
   };
 
   namespace XYAB_BUTTONS
   {
-    const int X = 28;
-    const int Y = 27;
-    const int A = 26;
-    const int B = 25;
+    const int X = 4;
+    const int Y = 5;
+    const int A = 6;
+    const int B = 7;
   };
 
   namespace TRIGGERS
@@ -96,8 +95,8 @@ namespace PINOUTS
 
   namespace MISC_BUTTONS
   {
-    const int MSC1 = 9;
-    const int MSC2 = 8;
+    const int HOME = 9;
+    const int MENU = 10;
   };
   
   //TODO
@@ -181,7 +180,7 @@ typedef struct Button {
 
 typedef struct Potentiometer {
   const int pin;
-  moving_average_filter<int>* filter;
+  moving_average_filter* filter;
   String name;
   // char key_press;
   int value = 0;
@@ -224,7 +223,6 @@ typedef struct Gyroscope {
 #define WIRE Wire1
 #define SCREEN_HEIGHT 320
 #define SCREEN_WIDTH 240
-#define PIN_BACKLIGHT 255   // optional, set this only if the screen LED pin is connected directly to the Teensy.
 /*
   pins to avoid for analog read (from https://forum.pjrc.com/index.php?threads%2Fteensy-4-1-adc-channels.72373%2F)
   255,	// 10/A10 AD_B0_12 - only on ADC1, 1 - can't use for audio
@@ -238,6 +236,7 @@ typedef struct Gyroscope {
   ...
 	1,      // 38/A14 AD_B1_12 - only on ADC2, do not use analogRead()
 	2,      // 39/A15 AD_B1_13 - only on ADC2, do not use analogRead()
+
 */
 
 // Adafruit_ILI9341 display = Adafruit_ILI9341(PINOUTS::TFT_DISPLAY::CS, PINOUTS::TFT_DISPLAY::DC);
@@ -247,9 +246,7 @@ DMAMEM uint16_t fb_internal[240 * 320]; // internal frame buffer
 
 ILI9341_T4::DiffBuffStatic<4096> diff1; // store changes in pixels so we don't have to refresh the entire screen
 ILI9341_T4::DiffBuffStatic<4096> diff2; // since we use two frame buffers, we have two of these as well. their github suggests two of these
-// tgx::dVec2 anchor;
-
-tgx::Image<tgx::RGB565> im(fb, SCREEN_HEIGHT, SCREEN_WIDTH);
+tgx::dVec2 anchor;
 
 ADC *adc();
 
@@ -258,16 +255,16 @@ Adafruit_MCP4728 mcp_dac;
 Adafruit_LSM6DSOX sox_gyro;
 
 float joystick_filter_coef = 0.9f;
-moving_average_filter<int> ljud_filter(joystick_filter_coef, 0);
-moving_average_filter<int> ljlr_filter(joystick_filter_coef, 0);
-moving_average_filter<int> rjud_filter(joystick_filter_coef, 0);
-moving_average_filter<int> rjlr_filter(joystick_filter_coef, 0);
-moving_average_filter<int>* joystick_filters[4] = {&ljud_filter, &ljlr_filter, &rjud_filter, &rjlr_filter};
+moving_average_filter ljud_filter(joystick_filter_coef, 0);
+moving_average_filter ljlr_filter(joystick_filter_coef, 0);
+moving_average_filter rjud_filter(joystick_filter_coef, 0);
+moving_average_filter rjlr_filter(joystick_filter_coef, 0);
+moving_average_filter* joystick_filters[4] = {&ljud_filter, &ljlr_filter, &rjud_filter, &rjlr_filter};
 
 float triggers_filter_coef = 0.9f;
-moving_average_filter<int> lt_filter(triggers_filter_coef, 2);
-moving_average_filter<int> rt_filter(triggers_filter_coef, 2);
-moving_average_filter<int>* trigger_filters[2] = {&lt_filter, &rt_filter};
+moving_average_filter lt_filter(triggers_filter_coef, 2);
+moving_average_filter rt_filter(triggers_filter_coef, 2);
+moving_average_filter* trigger_filters[2] = {&lt_filter, &rt_filter};
 
 BUTTON x_button = {PINOUTS::XYAB_BUTTONS::X, "X", KEY_X};
 BUTTON y_button = {PINOUTS::XYAB_BUTTONS::Y, "Y", KEY_Y};
@@ -279,8 +276,8 @@ BUTTON dpad_down_button = {PINOUTS::DPAD_BUTTONS::DOWN, "D", KEY_DOWN};
 BUTTON dpad_left_button = {PINOUTS::DPAD_BUTTONS::LEFT, "L", KEY_LEFT};
 BUTTON dpad_right_button = {PINOUTS::DPAD_BUTTONS::RIGHT, "R", KEY_RIGHT};  
 
-BUTTON misc_home_button = {PINOUTS::MISC_BUTTONS::MSC1, "MS1"};
-BUTTON misc_menu_button = {PINOUTS::MISC_BUTTONS::MSC2, "MS2"};
+BUTTON misc_home_button = {PINOUTS::MISC_BUTTONS::HOME, "MS1"};
+BUTTON misc_menu_button = {PINOUTS::MISC_BUTTONS::MENU, "MS2"};
 
 POT left_joystick_x = {PINOUTS::JOYSTICK_L::XOUT, &ljud_filter, "L-X"};
 POT left_joystick_y = {PINOUTS::JOYSTICK_L::YOUT, &ljlr_filter, "L-Y"};
@@ -469,21 +466,13 @@ void setup() {
   if(!display.begin())
     Serial.println("hello silas i did not begin -ili9341 display");
 
-  pinMode(PIN_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_BACKLIGHT, HIGH);  // ... turn on backlight
-  // ok. turn on backlight
-  // pinMode(PIN_BACKLIGHT, OUTPUT);
-  // digitalWrite(PIN_BACKLIGHT, HIGH);
-  // display.setRotation(3); // apparently this is portrait mode from some of the examples
-  display.setRotation(3); // apparently this is portrait mode from some of the examples
   display.setFramebuffer(fb_internal);
   display.setDiffBuffers(&diff1, &diff2);
-  display.setDiffGap(4); // small gap
   display.setRefreshRate(120); // refresh rate in MHz, frame rate can't exceed (rate) / 2
   display.setVSyncSpacing(2); // enable vsync and set framerate = refreshrate/2 (typical choice)
   // display.update(fb)
 
-  sox_gyro.begin_I2C(0x6A, &Wire);
+  sox_gyro.begin_I2C(0x6A, &Wire1);
   sox_gyro.setGyroRange(LSM6DS_GYRO_RANGE_500_DPS);
 
   if(!mcp_dac.begin(0x60, &Wire)) {
@@ -509,8 +498,7 @@ void setup() {
 
   // DEBUG_buttons(a_button, 100, 100, ILI9341_WHITE, ILI9341_BLACK);
 
-  im.drawText("debug display", {50, 50}, font_tgx_OpenSans_14, tgx::RGB565_White);
-  display.update(fb);
+  display.setRotation(4);
   // display.fillScreen(ILI9341_BLACK);
   // display.setCursor(0, 0);
   // display.setTextColor(ILI9341_WHITE);
@@ -530,6 +518,7 @@ void loop() {
 
   read_gyroscope(&gyro_vals);
   sneb_midi_gyro(&gyro_vals);
+  
 
   mcp_dac.fastWrite(normalise1(0, left_trigger.value, 0, 985, 0, 4095), normalise1(0, right_trigger.value, 0, 985, 0, 4095), 4095, 0);
   if(millis() > lastFrame + frameRate) {
@@ -596,6 +585,9 @@ float normalise1(float to_map, float from, float to, float low, float high) {
   return constrain(map(to_map, from, to, low, high), low, high);
 }
 
+// float rand_float(float from, float to) {
+//   return rand() % (to - from + 1) + from;
+// }
 int rand_int(int from, int to) {
   return rand() % (to - from + 1) + from;
 }
