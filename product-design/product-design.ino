@@ -306,7 +306,6 @@ GYRO gyro_vals {&sox_gyro};
 BUTTON* xyab_buttons[4] = {&x_button, &y_button, &a_button, &b_button};
 BUTTON* dpad_buttons[4] = {&dpad_up_button, &dpad_down_button, &dpad_left_button, &dpad_right_button};
 BUTTON* misc_buttons[2] = {&misc_home_button, &misc_menu_button};
-BUTTON* joystick_buttons[2] = {&left_joystick_select, &right_joystick_select};
 BUTTON* trigger_buttons[2] = {&left_button, &right_button};
 
 JOYSTICK* joysticks[2] = {&left_joystick, &right_joystick};

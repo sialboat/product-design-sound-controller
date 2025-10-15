@@ -10,7 +10,7 @@
 // }
 // void DEBUG_clear_text() {
 //   im.clear(tgx::RGB565_Black);
-//   display.update(fb);
+//   display.update(fb);`
 // }
 
 // void DEBUG_display_value(int value, int x, int y, color_t color = tgx::RGB565_White) {
