@@ -1,6 +1,16 @@
 //turning off so arduino doesn't complain, but this will most likely be depreciated.
 
-// #pragma once
+#pragma once
+
+/*
+  Base class for the behavior implementation of a parameter's macro-level event handling behavior,
+  adequately named the "behavior" class. Raw data from a parameter gets passed into this 
+
+*/
+class behavior
+{
+
+};
 
 // #include <map>
 

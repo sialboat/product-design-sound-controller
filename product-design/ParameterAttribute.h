@@ -1,6 +1,13 @@
 // // temporarily turning this off so arduino doesn't complain to me
 
-// #pragma once
+#pragma once
+/*
+  Base class for the micro-level attribute class
+*/
+class attribute
+{
+
+};
 
 // #include <map>
 // #include <Arduino.h>

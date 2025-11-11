@@ -16,6 +16,7 @@
 #include "dsp_filters.h"
 #include "ParameterAttribute.h"
 
+#define WIRE Wire1
 
 #pragma once
 
@@ -165,6 +166,7 @@ class pot : public parameter<int, 1, 1>
    bool begin() {
     type = POT;
     Serial.println("begin");
+    return true;
     // value_reader(pins);
    }
 
@@ -238,10 +240,6 @@ class button : public parameter<bool, 1, 1>
         Serial.println(pins[i]);
       }
     }
-    // for(int i = 0; i < std::size(pins); i++) {
-    //   Serial.println()
-    // }
-    // Serial.print(pins);
   }
   void read() noexcept override {
     prev_raw_value = raw_value;
@@ -290,45 +288,118 @@ enum class GYROSCOPE_VALS {
 class gyroscope : public parameter<float, 2, 7>
 {
   public:
-  gyroscope(Adafruit_LSM6DSOX, String _name, int _id, std::initializer_list<int> _pins, std::initializer_list<float> _coeffs) : 
-  name(_name), id(_id)
+
+  namespace GYRO_INDEX
   {
-    type = MISC;
-  }
-
-  void begin() noexcept override {
-
-  }
-
-  void read() noexcept override {
-
-  }
-
-  void process() noexcept override {
-
-  }
-
-  void debug() noexcept override {
+    const int ACCELX = 0;
+    const int ACCELY = 1;
+    const int ACCELZ = 2;
+    const int GYROX = 3;
+    const int GYROY = 4;
+    const int GYROZ = 5;
+    const int TEMP = 6;
     
   }
 
-  private:
+  gyroscope(Adafruit_LSM6DSOX, String _name, int _id, std::initializer_list<float> _coeffs) : 
+  name(_name), id(_id)
+  {
 
+    type = MISC;
+    accel_x = accel_y = accel_z =
+    gyro_x  = gyro_y. = gyro_z  =
+    temperature = 0.0f;
+
+    for(float f : _coeffs.v)
+      filters.push_back(moving_average_filter<float>(f));
+  }
+
+  bool begin() noexcept override {
+    if(!gyro.begin_I2C(0x60, &Wire)) {
+      Serial.println("Failed to find LSM6DSOX Gyroscope!");
+      return false;
+    }
+    Serial.println("We found the LSM6DSOX Gyroscope! Setting default range");
+    gyro.setGyroRange(LSM6DS_GYRO_RANGE_500_DPS);
+    return true;
+  }
+
+  void read() noexcept override {
+    sensors_event_t accel;
+    sensors_event_t gyro;
+    sensors_event_t temp;
+    raw_accel_x = acel.acceleration.x;
+    raw_accel_y = acel.acceleration.y;
+    raw_accel_z = acel.acceleration.z;
+    raw_gyro_x = gyro.gyro.x;
+    raw_gyro_y = gyro.gyro.y;
+    raw_gyro_z = gyro.gyro.z;
+    raw_temperature = temp.temperature;
+  }
+
+  void process() noexcept override {
+    accel_x = filters.at(0).process(raw_accel_x);
+    accel_y = filters.at(1).process(raw_accel_y);
+    accel_z = filters.at(2).process(raw_accel_z);
+    gyro_x = filters.at(3).process(raw_gyro_x);
+    gyro_y = filters.at(4).process(raw_gyro_y);
+    gyro_z = filters.at(5).process(raw_gyro_z);
+    temperature = filters.at(6).process(raw_temperature);
+  }
+
+  void debug() noexcept override {
+    String accel = "Accel - X: " + accel_x + "; Y: " + accel_y + "; Z: " + accel_z;
+    String gyro = "Gyro - X: " + gyro_x + "; Y: " + gyro_y + "; Z: " + gyro_z;
+    String temp = "Temp: - " + temperature;
+    String raw_accel = "Accel - X: " + raw_accel_x + "; Y: " + raw_accel_y + "; Z: " + raw_accel_z;
+    String raw_gyro = "Gyro - X: " + raw_gyro_x + "; Y: " + raw_gyro_y + "; Z: " + raw_gyro_z;
+    String raw_temp = "Temp: - " + raw_temperature;
+    Serial.println(name);
+
+    Serial.println(" --- raw values --- ");
+    Serial.println(raw_accel);
+    Serial.println(raw_gyro);
+    Serial.println(raw_temp);
+
+    Serial.println(" --- processed values --- ");
+    Serial.println(accel);
+    Serial.println(gyro);
+    Serial.println(temp);
+
+    Serial.println(" --- pins --- ");
+    Serial.println();
+
+  }
+
+  void set_coeff(int index, int )
+
+  private:
+  Adafruit_LSM6DSOX gyro;
+  std::vector<moving_average_filter> filters;
+  
+  // filter indexes are based on the ordering of these values.
+  float raw_accel_x, raw_accel_y, raw_accel_z,
+        raw_gyro_x,  raw_gyro_y,  raw_gyro_z,
+        raw_temperature;
+
+  float accel_x, accel_y, accel_z,
+        gyro_x,  gyro_y,  gyro_z,
+        temperature;
 };
 
 // enum class DAC_VALS {
 //   CHANNEL_1 = 0, CHANNEL_2 = 1, CHANNEL_3 = 2, CHANNEL_4 = 3
 // };
 // this technically isn't a paremeter.
-class dac
-{
-  public:
-  dac(String _name, int _id, std::initializer_list<int> _pins, std::initializer_list<float> coeffs) :
-  name(_name), id(_id)
-  {
-    param_type = MISC;
-  }
-};
+// class dac
+// {
+//   public:
+//   dac(String _name, int _id, std::initializer_list<int> _pins, std::initializer_list<float> coeffs) :
+//   name(_name), id(_id)
+//   {
+//     param_type = MISC;
+//   }
+// };
 //This serves to exist so we have a framework for how most parameter objects will exist
 // template <typename N>
 // class parameter {
