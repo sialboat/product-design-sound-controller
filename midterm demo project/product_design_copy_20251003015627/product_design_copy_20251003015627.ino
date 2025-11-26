@@ -1,5 +1,9 @@
 /*
   Midterm Demo Code
+  product_design_copy20251003015627.ino
+  current firmware version for Product Design Gaming Handheld MIDI Controller
+
+  will soon be deprecated, works as a "proof of concept" for the Product Design class.
 */
 
 #include <SPI.h>

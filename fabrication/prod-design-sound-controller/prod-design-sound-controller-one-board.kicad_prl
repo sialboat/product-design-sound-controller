@@ -1,8 +1,8 @@
 {
   "board": {
-    "active_layer": 2,
-    "active_layer_preset": "",
-    "auto_track_width": false,
+    "active_layer": 0,
+    "active_layer_preset": "All Layers",
+    "auto_track_width": true,
     "hidden_netclasses": [],
     "hidden_nets": [],
     "high_contrast_mode": 0,
@@ -49,7 +49,7 @@
       "conflict_shadows",
       "shapes"
     ],
-    "visible_layers": "00000000_00000000_00aaaaaa_aaaaaaaf",
+    "visible_layers": "ffffffff_ffffffff_ffffffff_ffffffff",
     "zone_display_mode": 0
   },
   "git": {
@@ -58,7 +58,7 @@
     "ssh_key": ""
   },
   "meta": {
-    "filename": "prod-design-sound-controller.kicad_prl",
+    "filename": "prod-design-sound-controller-one-board.kicad_prl",
     "version": 5
   },
   "net_inspector_panel": {
@@ -96,7 +96,7 @@
       103,
       74,
       103,
-      0
+      103
     ],
     "custom_group_rules": [],
     "expanded_rows": [],
