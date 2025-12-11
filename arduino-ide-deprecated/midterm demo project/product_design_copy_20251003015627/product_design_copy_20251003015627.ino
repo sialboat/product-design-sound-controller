@@ -160,11 +160,14 @@ typedef struct MINECRAFT_DEMO
   const int A = KEY_A;
   const int S = KEY_S;
   const int D = KEY_D;
+  const int OFFHAND = KEY_F;
 
   const int SPACE = KEY_SPACE;
   const int SHIFT = MODIFIERKEY_SHIFT;
-  const int VIEWS = KEY_F5;
-
+  const int VIEWS = KEY_C;
+  const int INVENTORY = KEY_E;
+  const int SCROLL_UP = 25;
+  const int SCROLL_DOWN = -25;
   // scroll up and down
   // const int NEXT_ITEM;
 
@@ -272,11 +275,11 @@ typedef struct Gyroscope {
   float gyro_y = 0.0f;          //radians
   float gyro_z = 0.0f;          //radians
   float temperature = 0.0f;     //degrees celcius
-  float gyro_vals[7] = {0.0f};
+  float* gyro_vals[7] = {&accel_x, &accel_y, &accel_z, &gyro_x, &gyro_y, &gyro_z, &temperature};
   float prev_gyro_vals[7] = {0.0f};
 } GYRO;
 
-#define WIRE Wire1
+#define WIRE Wire
 #define SCREEN_HEIGHT 320
 #define SCREEN_WIDTH 240
 /*
@@ -372,7 +375,7 @@ typedef void (*POT_BUTTON_CALLBACK)(POT* p);
 typedef void (*MOUSE_MOVE_CALLBACK)(POT* p);
 
 unsigned long lastFrame = 0;
-int frameRate = 30;
+int frameRate = 15;
 
 bool bypassButton = false;
 int bypassPin = 1;
@@ -436,6 +439,13 @@ void read_gyroscope(GYRO* g) {
   sensors_event_t gyro;
   sensors_event_t temp;
   g->gyroscope->getEvent(&accel, &gyro, &temp);
+  g->prev_gyro_vals[0] = g->accel_x;
+  g->prev_gyro_vals[1] = g->accel_y;
+  g->prev_gyro_vals[2] = g->accel_z;
+  g->prev_gyro_vals[3] = g->gyro_x;
+  g->prev_gyro_vals[4] = g->gyro_y;
+  g->prev_gyro_vals[5] = g->gyro_z;
+  g->prev_gyro_vals[6] = g->temperature;
   g->accel_x = accel.acceleration.x;
   g->accel_y = accel.acceleration.y;
   g->accel_z = accel.acceleration.z;
@@ -445,6 +455,44 @@ void read_gyroscope(GYRO* g) {
   g->temperature = temp.temperature;
 }
 
+void display_gyros(GYRO& g, int x, int y, int text, int bg, bool flag = true) {
+  size_t g_size = std::size(g.gyro_vals) - 1;
+  String names[7] = {"aX", "aY", "aZ", "gX", "gY", "gZ", "tp"};
+  int precision = 2; // 5 spaces per value max, not including around.
+  uint16_t xOut = x;
+  uint16_t yOut = y;
+  uint16_t newLine = 0;
+  uint16_t count = 0;
+  for(size_t i = 0; i < g_size; i++) {
+    if(*(g.gyro_vals[i]) != g.prev_gyro_vals[i]) {
+      char buffer[20] = {0};
+      xOut = x + (12 * (10 * count));
+      if(xOut >= 312 || count >= 2) {
+        newLine++;
+        xOut = x;
+        count = 0;
+      }
+      yOut = y + (16 * newLine);
+
+      count++;
+      dtostrf(*(g.gyro_vals[i]), 0, precision, buffer);
+      String out = names[i] + ": " + buffer;
+      display_and_clear(out, xOut, yOut, text, bg);
+    }
+  }
+  newLine++;
+  if(*(g.gyro_vals[6]) != g.prev_gyro_vals[6]) {
+    String out = names[6] + ": " + *(g.gyro_vals[6]);
+    display_and_clear(out, x, y + (16 * newLine), text, bg);
+  }
+}
+
+void display_and_clear(String value, int x, int y, int text, int bg) {
+  DEBUG_clear_text(value, x, y);
+  // delay(10);
+  DEBUG_display_text(value, text, bg, x, y);
+}
+
 void sneb_midi_gyro(GYRO* g) {
   usbMIDI.sendControlChange(1, normalise1(g->gyro_x, -1.0f, 1.0f, 0.0f, 127.0f), 1);
   usbMIDI.sendControlChange(2, normalise1(g->gyro_y, -1.0f, 1.0f, 0.0f, 127.0f), 1);
@@ -452,11 +500,11 @@ void sneb_midi_gyro(GYRO* g) {
   usbMIDI.sendControlChange(4, normalise1(g->accel_x, -1.0f, 1.0f, 0.0f, 127.0f), 1);
   usbMIDI.sendControlChange(5, normalise1(g->accel_y, -1.0f, 1.0f, 0.0f, 127.0f), 1);
   usbMIDI.sendControlChange(6, normalise1(g->accel_z, -1.0f, 1.0f, 0.0f, 127.0f), 1);
-  // usbMIDI.sendControlChange(7, g->temperature, 1);
+  usbMIDI.sendControlChange(7, normalise1(g->temperature, 0.0f, 30.0f, 0.0f, 127.0f), 1);
 }
 
 void sned_midi_cc_pot(POT* p, int chan, int low, int high) {
-  usbMIDI.sendControlChange(chan, normalise1(p->value, low, high, 0s, 127), 1);
+  usbMIDI.sendControlChange(chan, normalise1(p->value, low, high, 0, 127), 1);
 }
 
 void read_joysticks(JOYSTICK* joysticks[], size_t size) {
@@ -504,11 +552,39 @@ void press_button_demo(BUTTON* button, const int key) {
   }
   // delay(20);
 }
+void scroll_button_demo(BUTTON* button, const int amt) {
+  // if(millis() - lastFrame >= 25) {
+    // lastFrame = millis();
+    if(button->button_state == BUTTON_STATE::PRESS || button->button_state == BUTTON_STATE::HOLD) {
+      if(!button->pressed) {
+        Mouse.scroll(amt);
+        button->pressed = true;
+      }
+    } else {
+      button->pressed = false;
+    }
+  // }
+  // if( (button->prev_button_state == BUTTON_STATE::OFF && button->button_state == BUTTON_STATE::PRESS) || 
+  //     (button->prev_button_state == BUTTON_STATE::HOLD && button->button_state == BUTTON_STATE::HOLD)) {
+  //   if(!button->pressed) {
+  //     Mouse.scroll(amt);
+  //     // Mouse.move(0, 0, amt);
+  //     button->pressed = true;
+  //   }
+  // } else {
+  //   if(button->pressed) {
+  //     Mouse.scroll(0);
+  //     // Mouse.scroll(0, 0);
+  //     button->pressed = false;
+  //     // Mouse.move(0, 0, 0);
+  //   }
+  // }
+}
 
 void press_misc_midi_test(BUTTON* button, int mode) {
   if(button->button_state == BUTTON_STATE::PRESS) {
     if(static_cast<OUTPUT_MODE>(mode) == OUTPUT_MODE::KEYBOARD) {
-      int randNote = rand_int(20, 80);
+      int randNote = rand_int(36, 76);
       usbMIDI.sendNoteOn(randNote, 100, 1);
       delay(150);
       usbMIDI.sendNoteOff(randNote, 100, 1);
@@ -516,7 +592,35 @@ void press_misc_midi_test(BUTTON* button, int mode) {
   }
 }
 
+void gyro_move_mouse(GYRO& g) {
+  float bias = 0.1f;
+  float sensitivity_x = 1.0f;
+  float sensitivity_y = 1.0f;
+  int moveX = ((g.gyro_z) * 10) * sensitivity_x;
+  int moveY = (-(g.gyro_x) * 10) * sensitivity_y;
+
+  if(moveX != 0 || moveY != 0) {
+    Mouse.move(moveX, moveY);
+  }
+}
+
 void move_mouse(int xPin, int yPin, int xBias, int yBias, int threshold = 10, float sensitivity = 0.05f) {
+  int x = analogRead(xPin) - xBias;
+  int y = analogRead(yPin) - yBias;
+
+  if(abs(x) < threshold) x = 0;
+  if(abs(y) < threshold) y = 0;
+
+  float moveX = x * sensitivity;
+  float moveY = y * sensitivity;
+  if(x != 0 || y != 0) {
+    Mouse.move((int)moveX, (int)moveY);
+    // delay(10);
+  }
+}
+
+// -500 -500. Check if less than 50 or around 100
+void move_mouse_a(int xPin, int yPin, int xBias, int yBias, int threshold = 10, float sensitivity = 0.05f) {
   int x = analogRead(xPin) - xBias;
   int y = analogRead(yPin) - yBias;
 
@@ -702,49 +806,72 @@ void setup() {
 
   // DEBUG_buttons(a_button, 100, 100, ILI9341_WHITE, ILI9341_BLACK);
 
-  display.setRotation(4);
+  display.setRotation(3);
   display.fillScreen(ILI9341_BLACK);
   display.setCursor(0, 0);
   display.setTextColor(ILI9341_WHITE);
   display.setTextSize(2); //2(6 x 8)
-  display.setRotation(4);
   display.println("debug display");
 }
 void loop() {
   
   read_all_params();
+  read_gyroscope(&gyro_vals);
   // Serial.println(left_joystick_x.value);
 
   // press_from_joystick(&left_joystick, 507, 507, 506, 506, hades.UP, hades.DOWN, hades.LEFT, hades.RIGHT);
   bypassButton = !digitalRead(bypassPin);
+  // if(millis() - lastFrame >= frameRate) {
+    // lastFrame = millis();
+    if(!bypassButton) {
+      // press_down_from_pot(&left_joystick.x_pot, 507,  );
+      // press_up_from_pot(&left_joystick.x_pot, 507,  );
 
-  if(!bypassButton) {
-    press_down_from_pot(&left_joystick.x_pot, 507, hades.UP);
-    press_up_from_pot(&left_joystick.x_pot, 507, hades.DOWN);
-    press_up_from_pot(&left_joystick.y_pot, 506, hades.RIGHT);
-    press_down_from_pot(&left_joystick.y_pot, 506, hades.LEFT);
-    // Keyboard.releaseAll();
+      // press_up_from_pot(&left_joystick.y_pot, 506,  );
+      // press_down_from_pot(&left_joystick.y_pot, 506,  );
+      // // Keyboard.releaseAll();
 
-    // key press
-    click_mouse(&right_joystick_select, hades.LEFT_MOUSE);
-    click_mouse(&dpad_up_button, hades.RIGHT_MOUSE);
-    press_button_demo(&dpad_down_button, hades.INTERACT);
-    press_button_demo(&dpad_left_button, hades.SPECIAL);
-    press_button_demo(&dpad_right_button, hades.CALL);
+      // // key press
+      // click_mouse(&right_joystick_select, );
+      // click_mouse(&left_joystick_select, );
+      // click_mouse(&dpad_up_button,  );
 
-    press_button_demo(&left_joystick_select, hades.DASH);
+      press_button_demo(&dpad_up_button, minecraft.W);
+      press_button_demo(&dpad_down_button, minecraft.S);
+      press_button_demo(&dpad_left_button, minecraft.A);
+      press_button_demo(&dpad_right_button, minecraft.D);
+      press_button_demo(&a_button, minecraft.SPACE);
+      click_mouse(&x_button, minecraft.LMB);
+      click_mouse(&y_button, minecraft.RMB);
+      press_button_demo(&b_button, minecraft.SHIFT);
+      press_button_demo(&left_joystick_select, minecraft.VIEWS);
+      press_button_demo(&right_joystick_select, minecraft.INVENTORY);
+      scroll_button_demo(&misc_home_button, minecraft.SCROLL_UP);
+      scroll_button_demo(&misc_menu_button, minecraft.SCROLL_DOWN);
+      gyro_move_mouse(gyro_vals);
 
-    press_button_demo(&x_button, hades.GIFT);
-    press_button_demo(&y_button, hades.BOON_INFO);
-    press_button_demo(&a_button, hades.CODEX);
+      // Keyboard.releaseAll();
+      // press_button_demo(&x_button,  );
+      // press_button_demo(&y_button,  );
+      // press_button_demo(&a_button,  );
 
-    move_mouse(PINOUTS::JOYSTICK_R::XOUT, PINOUTS::JOYSTICK_R::YOUT, 507, 506, 10, 0.05f);
-    sneb_midi_gyro(&gyro_vals);
-  }
-  sned_midi_cc_pot(&left_joystick.x_pot, 7, 1, 1027);
-  sned_midi_cc_pot(&left_joystick.y_pot, 8, 1, 1027);
-  sned_midi_cc_pot(&right_joystick.x_pot, 9, 1, 1027);
-  sned_midi_cc_pot(&right_joystick.y_pot, 10, 1, 1027);
+      // move_mouse_a(PINOUTS::JOYSTICK_L::XOUT, PINOUTS::JOYSTICK_L::XOUT, 507, 506, 10, 0.05f);
+    }
+
+  
+
+  // }
+  
+  // usbMIDI.sendControlChange(1, normalise1(gyro_vals.gyro_x, -1.0f, 1.0f, 0.0f, 127.0f), 1);
+  // usbMIDI.sendControlChange(2, normalise1(gyro_vals.gyro_y, -1.0f, 1.0f, 0.0f, 127.0f), 1);
+  // usbMIDI.sendControlChange(3, normalise1(gyro_vals.gyro_z, -1.0f, 1.0f, 0.0f, 127.0f), 1);
+  // usbMIDI.sendControlChange(4, normalise1(gyro_vals.accel_x, -1.0f, 1.0f, 0.0f, 127.0f), 1);
+  // usbMIDI.sendControlChange(5, normalise1(gyro_vals.accel_y, -1.0f, 1.0f, 0.0f, 127.0f), 1);
+  // usbMIDI.sendControlChange(6, normalise1(gyro_vals.accel_z, -1.0f, 1.0f, 0.0f, 127.0f), 1);
+  // usbMIDI.sendControlChange(7, normalise1(gyro_vals.temperature, 0.0f, 30.0f, 0.0f, 127.0f), 1);
+  // sned_midi_cc_pot(&left_joystick.y_pot, 9, 1, 1027);
+  // sned_midi_cc_pot(&right_joystick.x_pot, 9, 1, 1027);
+  // sned_midi_cc_pot(&right_joystick.y_pot, 10, 1, 1027);
   // press_up_from_pot(&left_joystick_y, 512, hades.LEFT);
   // press_down_from_pot(&left_joystick_y 512, hades.RIGHT);
 
@@ -754,6 +881,8 @@ void loop() {
   // mouse movement
   // void move_mouse(int xPin, int yPin, int xBias, int yBias, int threshold = 10, float sensitivity = 0.05f)
 
+  sneb_midi_gyro(&gyro_vals);
+  sned_midi_cc_pot(&left_joystick.x_pot, 8, 1, 1027);
 
   // MIDI Note Senders
   for(size_t i = 0; i < 4; i++) {
@@ -767,29 +896,39 @@ void loop() {
   }
 
   // MIDI CC
-  read_gyroscope(&gyro_vals);
-  
-
-  mcp_dac.fastWrite(normalise1(0, left_trigger.value, 0, 985, 0, 4095), normalise1(0, right_trigger.value, 0, 985, 0, 4095), 4095, 0);
-  display_all_params();
+  // Serial.println(gyro_vals.gyro_x);
+  // mcp_dac.fastWrite(normalise1(0, left_trigger.value, 0, 985, 0, 4095), normalise1(0, right_trigger.value, 0, 985, 0, 4095), 4095, 0);
+  // display_all_params();
 }
 
 void display_all_params() {
   //arrays of size 4
+  display_gyros(gyro_vals, 0, 96, ILI9341_DARKCYAN, ILI9341_BLACK);
+  display_switch();
   for(size_t i = 0; i < 4; i++) {
-    DEBUG_buttons(xyab_buttons[i], 0, 50 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-    DEBUG_buttons(dpad_buttons[i], 84, 50 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
+    DEBUG_buttons(xyab_buttons[i], 0, 32 + (16 * i), ILI9341_OLIVE, ILI9341_BLACK);
+    DEBUG_buttons(dpad_buttons[i], 84, 32 + (16 * i), ILI9341_DARKGREEN, ILI9341_BLACK);
   }
   //arrays of size 2
+    // DEBUG_potentiometers(&joysticks[0]->x_pot, 0, 176, ILI9341_WHITE, ILI9341_BLACK, true);
   for(size_t i = 0; i < 2; i++) {
     // press_button(misc_buttons[i]);
-    DEBUG_potentiometers(&joysticks[i]->x_pot, 0, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK, true);
-    DEBUG_potentiometers(&joysticks[i]->y_pot, 120, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK, true);
-    DEBUG_buttons(joystick_buttons[i], 0, 178 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-    DEBUG_buttons(misc_buttons[i], 134, 178 + (16 * i), ILI9341_WHITE, ILI9341_BLACK);
-    DEBUG_buttons(trigger_buttons[i], 0 + (96 * i), 242, ILI9341_WHITE, ILI9341_BLACK);
-    DEBUG_potentiometers(triggers[i], 0 + (96 * i), 226, ILI9341_WHITE, ILI9341_BLACK, true);
+    // DEBUG_potentiometers(&joysticks[i]->y_pot, 120, 130 + (16 * i), ILI9341_WHITE, ILI9341_BLACK, true);
+    DEBUG_buttons(joystick_buttons[i], 0, 194 + (16 * i), ILI9341_ORANGE, ILI9341_BLACK);
+    DEBUG_buttons(misc_buttons[i], 134, 194 + (16 * i), ILI9341_MAGENTA, ILI9341_BLACK);
+    DEBUG_buttons(trigger_buttons[i], 0 + (96 * i), 242, ILI9341_MAROON, ILI9341_BLACK);
+    // DEBUG_potentiometers(triggers[i], 0 + (96 * i), 226, ILI9341_WHITE, ILI9341_BLACK, true);
   }
+}
+
+void display_switch() {
+  String out = "BYP: ";
+  if(bypassButton) {
+    out += "ON";
+  } else {
+    out += "OFF";
+  }
+  display_and_clear(out, 0, 16 * 11, ILI9341_NAVY, ILI9341_BLACK);
 }
 
 void read_all_params() {
